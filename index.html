@@ -110,8 +110,8 @@
       </div>
 
       <div class="meta-bar">
-        <span>Meta del ciclo: <strong id="meta-valor">—</strong></span>
-        <button class="btn-sec btn-sm" onclick="editarMeta()"><span data-ic="edit"></span>Editar</button>
+        <span id="meta-label">Meta del ciclo: <strong id="meta-valor">—</strong></span>
+        <button class="btn-sec btn-sm" id="meta-edit-btn" onclick="switchTab('zonas')" style="display:none"><span data-ic="map-pin"></span>Editar zonas</button>
       </div>
 
       <!-- Rendimiento principal -->
@@ -371,6 +371,27 @@
         <div><h2 class="page-title">Usuarios</h2><p class="page-sub">Gestionados desde Google Sheets — hoja <strong>Usuarios</strong></p></div>
       </div>
       <div id="users-list" class="list"></div>
+    </div>
+
+    <!-- ── ZONAS (Carteras + Metas) ─────────────────── -->
+    <div id="tab-zonas" class="tab">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Zonas</h2>
+          <p class="page-sub">Cada zona tiene su meta. La suma es la meta global del ciclo.</p>
+        </div>
+        <button class="btn-pri" onclick="nuevaCartera()"><span data-ic="plus-circle"></span>Nueva zona</button>
+      </div>
+
+      <div class="card" style="margin-bottom:18px">
+        <div class="card-title"><span data-ic="target"></span>Meta global del ciclo</div>
+        <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
+          <div class="proy-pct" id="zonas-meta-total" style="font-size:44px">L 0.00</div>
+          <div style="color:var(--t3);font-size:13px" id="zonas-meta-detalle">Suma de todas las zonas</div>
+        </div>
+      </div>
+
+      <div id="zonas-list" class="list"></div>
     </div>
   </main>
 </div>

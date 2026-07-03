@@ -9,9 +9,9 @@ const CONFIG = {
   META_CICLO: 0,
 
   ROLES: {
-    gerente:    { label:'Gerente',    tabs:['dashboard','cartera','hoy','historial','pagos','ranking','logros','usuarios'], canEditUsers:true,  canSeeAllGestiones:true,  canDelete:true  },
-    supervisor: { label:'Supervisor', tabs:['dashboard','cartera','hoy','historial','pagos','ranking','logros'],            canEditUsers:false, canSeeAllGestiones:true,  canDelete:false },
-    gestor:     { label:'Gestor',     tabs:['dashboard','cartera','hoy','historial','pagos','logros'],                      canEditUsers:false, canSeeAllGestiones:false, canDelete:false },
+    gerente:    { label:'Gerente',    tabs:['dashboard','cartera','hoy','historial','pagos','ranking','logros','usuarios','zonas'], canEditUsers:true,  canSeeAllGestiones:true,  canDelete:true,  canEditZonas:true  },
+    supervisor: { label:'Supervisor', tabs:['dashboard','cartera','hoy','historial','pagos','ranking','logros','zonas'],            canEditUsers:false, canSeeAllGestiones:true,  canDelete:false, canEditZonas:true  },
+    gestor:     { label:'Gestor',     tabs:['dashboard','cartera','hoy','historial','pagos','logros'],                              canEditUsers:false, canSeeAllGestiones:false, canDelete:false, canEditZonas:false },
   },
 
   // Colores alineados con el design system Soft Modern (paleta cálida)
@@ -33,6 +33,7 @@ const CONFIG = {
     { id:'pagos',     label:'Pagos',       iconId:'credit-card'   },
     { id:'ranking',   label:'Ranking',     iconId:'award'         },
     { id:'logros',    label:'Logros',      iconId:'star'          },
+    { id:'zonas',     label:'Zonas',       iconId:'map-pin'       },
     { id:'usuarios',  label:'Usuarios',    iconId:'users'         },
   ],
 

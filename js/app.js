@@ -1,7 +1,7 @@
 // ============================================================
 // APP v4 - Cobros Pro  |  Soft Modern
 // ============================================================
-let D = { prestamos:[], pagos:[], gestiones:[] };
+let D = { prestamos:[], pagos:[], gestiones:[], carteras:[] };
 let USER = null, estadoSel = '', clienteAct = null;
 let siguienteLista = [], siguienteIdx = 0;
 let timerInterval = null, timerInicio = null;
@@ -294,6 +294,7 @@ function switchTab(id) {
     case 'ranking':   renderRanking();   break;
     case 'logros':    renderLogros();    break;
     case 'usuarios':  renderUsers();     break;
+    case 'zonas':     renderZonas();     break;
   }
 }
 
@@ -303,12 +304,13 @@ function switchTab(id) {
 async function cargarTodosDatos() {
   document.getElementById('loading').style.display='flex';
   try {
-    const [pr, pa, ge, meta] = await Promise.all([
-      API.getPrestamos(), API.getPagos(), API.getGestiones(), API.getMeta()
+    const [pr, pa, ge, meta, ca] = await Promise.all([
+      API.getPrestamos(), API.getPagos(), API.getGestiones(), API.getMeta(), API.getCarteras()
     ]);
     D.prestamos  = pr.data||[];
     D.pagos      = pa.data||[];
     D.gestiones  = ge.data||[];
+    D.carteras   = ca.data||[];
     CONFIG.META_CICLO = meta.meta||0;
     try { const db=await API.getDashboard(); if(db.success) dashData=db.data; } catch(e){}
     toast('Datos sincronizados','success');
@@ -380,7 +382,16 @@ function renderDash() {
   const totCar = act.reduce((s,p)=>s+p.balance,0);
   const totCuo = act.reduce((s,p)=>s+p.balanceCuotas,0);
   const totRec = pagosAct.reduce((s,p)=>s+p.valor,0);
-  const meta   = CONFIG.META_CICLO || totCuo;
+  // Meta: si es gestor con cartera asignada, usa la meta de esa cartera.
+  //       Para gerente/supervisor, es la suma de todas las carteras.
+  //       Fallback: CONFIG.META_CICLO (legacy) o suma de cuotas activas.
+  let meta;
+  if (esGestor) {
+    const zona = D.carteras.find(z => z.nombre === USER.cartera);
+    meta = zona ? zona.meta : (CONFIG.META_CICLO || totCuo);
+  } else {
+    meta = D.carteras.length ? D.carteras.reduce((s,z)=>s+z.meta,0) : (CONFIG.META_CICLO || totCuo);
+  }
   const cliU   = [...new Set(act.map(p=>p.cliente))];
   let gH = D.gestiones.filter(g=>g.fecha===hoyStr);
   if (esGestor) gH = gH.filter(g=>g.gestor===USER.nombre);
@@ -398,6 +409,12 @@ function renderDash() {
 
   // ── Meta configurable ────────────────────────────────────
   document.getElementById('meta-valor').textContent = fL(meta);
+  const metaLbl = document.getElementById('meta-label');
+  if (metaLbl) metaLbl.innerHTML = (esGestor
+    ? `Meta de <strong>${esc(USER.cartera||'—')}</strong>: `
+    : 'Meta del ciclo: ') + `<strong id="meta-valor">${fL(meta)}</strong>`;
+  const metaBtn = document.getElementById('meta-edit-btn');
+  if (metaBtn) metaBtn.style.display = CONFIG.ROLES[USER.rol]?.canEditZonas ? 'inline-flex' : 'none';
 
   // ── Cálculos ──────────────────────────────────────────────
   const metaDiaria   = meta / (c.totalDias || 1);
@@ -656,14 +673,138 @@ function renderMiniRanking(gH) {
     : `<div class="empty" style="padding:24px">${ic('activity',32)}<span class="empty-label">Sin gestiones hoy</span></div>`;
 }
 
-// ── META CONFIGURABLE ─────────────────────────────────────────
+// ── META CONFIGURABLE (legacy) ────────────────────────────────
 function editarMeta() {
-  const nueva = prompt(`Meta del ciclo actual:\nActual: ${fL(CONFIG.META_CICLO)}\n\nIngresa nueva meta (solo número):`);
-  if (!nueva || isNaN(nueva)) return;
-  CONFIG.META_CICLO = parseFloat(nueva);
-  API.guardarMeta(CONFIG.META_CICLO).catch(()=>{});
-  renderDash();
-  toast('Meta actualizada: '+fL(CONFIG.META_CICLO),'success');
+  // La meta ahora se administra por zona. Redirigimos.
+  switchTab('zonas');
+}
+
+// ══════════════════════════════════════
+// ZONAS (Carteras + Metas)
+// ══════════════════════════════════════
+function renderZonas() {
+  if (!USER || !CONFIG.ROLES[USER.rol]?.canEditZonas) {
+    document.getElementById('zonas-list').innerHTML =
+      `<div class="empty">${ic('lock',38)}<span class="empty-label">Sin permisos para administrar zonas</span></div>`;
+    document.getElementById('zonas-meta-total').textContent = 'L 0.00';
+    return;
+  }
+
+  // Meta global = suma
+  const total = D.carteras.reduce((s,z)=>s+z.meta,0);
+  document.getElementById('zonas-meta-total').textContent = fL(total);
+  document.getElementById('zonas-meta-detalle').textContent =
+    D.carteras.length + ' zona' + (D.carteras.length===1?'':'s') + ' · Meta se suma automáticamente';
+
+  const el = document.getElementById('zonas-list');
+  if (!D.carteras.length) {
+    el.innerHTML = `<div class="empty">${ic('map-pin',38)}<span class="empty-label">Aún no hay zonas configuradas</span><button class="btn-pri" style="margin-top:10px" onclick="nuevaCartera()">${ic('plus-circle',14)}Crear primera zona</button></div>`;
+    return;
+  }
+
+  // Enriquecer con stats reales por cartera
+  const stats = D.carteras.map(z => {
+    const prestamos = D.prestamos.filter(p => p.cartera === z.nombre);
+    const pagos     = D.pagos.filter(p => p.cartera === z.nombre);
+    const clientes  = new Set(prestamos.map(p=>p.cliente));
+    const recuperado= pagos.reduce((s,p)=>s+p.valor,0);
+    const pct       = z.meta > 0 ? (recuperado / z.meta * 100) : 0;
+    return { ...z, clientes:clientes.size, recuperado, pct };
+  });
+
+  el.innerHTML = stats.map(z => {
+    const pctCol = z.pct >= 100 ? 'var(--green)' : z.pct >= 70 ? 'var(--amber)' : 'var(--red)';
+    return `<div class="li" style="flex-direction:column;align-items:stretch;gap:12px">
+      <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px">
+          <div class="li-name" style="font-size:15px;display:flex;align-items:center;gap:8px">
+            ${ic('map-pin',13)}${esc(z.nombre)}
+          </div>
+          ${z.descripcion?`<div class="li-det" style="margin-top:4px">${esc(z.descripcion)}</div>`:''}
+          <div class="li-det" style="margin-top:6px">
+            ${ic('users',11)}<span>${z.clientes} cliente${z.clientes===1?'':'s'}</span>
+            <span style="color:var(--t4)">·</span>
+            ${ic('dollar-sign',11)}<span>Recuperado: <strong style="font-family:var(--font-mono);color:var(--green)">${fL(z.recuperado)}</strong></span>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div class="cli-balance" style="font-size:18px">${fL(z.meta)}</div>
+          <div class="cli-cuota" style="font-size:11px">Meta del ciclo</div>
+        </div>
+        <div style="display:flex;gap:6px;align-self:center">
+          <button class="btn-sec btn-sm" onclick='editarCartera(${JSON.stringify(z)})'>${ic('edit',12)}Editar</button>
+          <button class="btn-icon" onclick='borrarCartera(${JSON.stringify(z.nombre)})' title="Eliminar">${ic('trash-2',13)}</button>
+        </div>
+      </div>
+      <div class="prog">
+        <div class="prog-head">
+          <span class="prog-lbl">Avance de recuperación</span>
+          <span class="prog-pct" style="color:${pctCol}">${z.pct.toFixed(1)}%</span>
+        </div>
+        <div class="prog-track"><div class="prog-fill" style="width:${Math.min(z.pct,100)}%;background:${pctCol}"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function nuevaCartera() {
+  const nombre = prompt('Nombre de la zona (ej: Zona 1, Choloma Norte):');
+  if (!nombre || !nombre.trim()) return;
+  const nombreLimpio = nombre.trim();
+  if (D.carteras.some(z => z.nombre.toLowerCase() === nombreLimpio.toLowerCase())) {
+    toast('Ya existe una zona con ese nombre','error'); return;
+  }
+  const metaStr = prompt(`Meta del ciclo para ${nombreLimpio} (solo número):`, '0');
+  if (metaStr === null) return;
+  const meta = parseFloat(metaStr)||0;
+  if (meta < 0) { toast('La meta debe ser positiva','error'); return; }
+  const desc = prompt('Descripción (opcional):', '') || '';
+
+  const c = { nombre: nombreLimpio, meta, descripcion: desc.trim() };
+  D.carteras.push(c);
+  renderZonas();
+  API.guardarCartera(c).then(()=>{
+    toast('Zona creada: ' + nombreLimpio, 'success');
+    refrescarPostZonas();
+  }).catch(()=>toast('Guardada localmente','error'));
+}
+
+function editarCartera(z) {
+  const nombreNuevo = prompt('Nombre de la zona:', z.nombre);
+  if (!nombreNuevo || !nombreNuevo.trim()) return;
+  const metaStr = prompt(`Meta del ciclo para ${nombreNuevo.trim()}:`, z.meta);
+  if (metaStr === null) return;
+  const meta = parseFloat(metaStr)||0;
+  if (meta < 0) { toast('La meta debe ser positiva','error'); return; }
+  const desc = prompt('Descripción (opcional):', z.descripcion || '');
+
+  const c = { nombre: nombreNuevo.trim(), meta, descripcion: (desc||'').trim(), nombreAnterior: z.nombre };
+  const idx = D.carteras.findIndex(x => x.nombre === z.nombre);
+  if (idx >= 0) D.carteras[idx] = { nombre:c.nombre, meta:c.meta, descripcion:c.descripcion };
+  renderZonas();
+  API.guardarCartera(c).then(()=>{
+    toast('Zona actualizada','success');
+    refrescarPostZonas();
+  }).catch(()=>toast('Guardada localmente','error'));
+}
+
+function borrarCartera(nombre) {
+  if (!confirm(`¿Eliminar la zona "${nombre}"?\n\nLos clientes con esta cartera seguirán existiendo, pero perderás la meta configurada.`)) return;
+  D.carteras = D.carteras.filter(z => z.nombre !== nombre);
+  renderZonas();
+  API.eliminarCartera(nombre).then(()=>{
+    toast('Zona eliminada','success');
+    refrescarPostZonas();
+  }).catch(()=>toast('Eliminada localmente','error'));
+}
+
+// Después de cambiar una zona, refresca dashboard y filtros para reflejar la meta nueva
+function refrescarPostZonas() {
+  // Reset del dropdown de carteras para que se repueble
+  const fcEl = document.getElementById('f-cart');
+  if (fcEl) {
+    while (fcEl.options.length > 1) fcEl.remove(1);
+  }
 }
 
 // ══════════════════════════════════════
@@ -695,7 +836,10 @@ function filtrarCartera() {
     case 'mora':          cls.sort((a,b)=>(diasDesdeUltimoPago(b.cliente)||0)-(diasDesdeUltimoPago(a.cliente)||0)); break;
   }
 
-  const carteras=[...new Set(D.prestamos.map(p=>p.cartera).filter(Boolean))];
+  // Prioriza la lista canónica de Zonas; si aún no hay, deduce de los préstamos
+  const carteras = D.carteras.length
+    ? D.carteras.map(z=>z.nombre)
+    : [...new Set(D.prestamos.map(p=>p.cartera).filter(Boolean))];
   const fcEl=document.getElementById('f-cart');
   if(fcEl&&fcEl.options.length<=1) carteras.forEach(ca=>fcEl.innerHTML+=`<option value="${esc(ca)}">${esc(ca)}</option>`);
 
