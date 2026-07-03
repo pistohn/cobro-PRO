@@ -248,6 +248,19 @@ function buildMenu() {
   const perms = CONFIG.ROLES[USER.rol];
   const menu  = document.getElementById('sidebar-menu');
   menu.innerHTML = '';
+
+  // Guardia: si el rol del usuario no existe en CONFIG.ROLES, avisar y no romper la app
+  if (!perms) {
+    const rolesValidos = Object.keys(CONFIG.ROLES).join(', ');
+    menu.innerHTML = `<div style="padding:14px;font-size:12px;color:var(--red);line-height:1.5;background:var(--red-a);border:1px solid var(--red-a2);border-radius:var(--r2);margin:4px">
+      <strong>Rol no reconocido:</strong> "${esc(USER.rol||'(vacío)')}"<br><br>
+      Roles válidos: <strong>${rolesValidos}</strong>.<br><br>
+      Corregí el rol en la hoja <strong>Usuarios</strong> de la Sheet y volvé a ingresar.
+    </div>`;
+    toast('Rol inválido: "'+(USER.rol||'')+'". Corregilo en la hoja Usuarios.','error');
+    return;
+  }
+
   CONFIG.TABS.filter(t => perms.tabs.includes(t.id)).forEach(t => {
     menu.innerHTML += `<button class="menu-item${t.id==='dashboard'?' active':''}" data-tab="${t.id}" onclick="switchTab('${t.id}')" title="${esc(t.label)}"><span class="icon icon-md">${icon(t.iconId,16)}</span><span class="menu-label">${esc(t.label)}</span></button>`;
   });
@@ -595,7 +608,10 @@ function renderDash() {
   } else pvBox.style.display='none';
 
   // ── MINI RANKING ──────────────────────────────────────────
-  renderMiniRanking(gH);
+  // Mini ranking solo para gerente/supervisor
+  const miniRankCard = document.getElementById('mini-ranking-card');
+  if (miniRankCard) miniRankCard.style.display = esGestor ? 'none' : '';
+  if (!esGestor) renderMiniRanking(gH);
 }
 
 function renderGraficoCobro(pagosFiltrados) {
@@ -1024,6 +1040,8 @@ function filtrarPagos() {
   const ft=document.getElementById('fp-txt')?.value.toLowerCase()||'';
   const fm=document.getElementById('fp-medio')?.value||'';
   let p=[...D.pagos].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  // Un gestor solo ve pagos de su cartera
+  if (USER && USER.rol==='gestor' && USER.cartera) p = p.filter(x=>x.cartera===USER.cartera);
   if(ft) p=p.filter(x=>x.cliente.toLowerCase().includes(ft));
   if(fm) p=p.filter(x=>(x.medioPago||'efectivo')===fm);
   const totV=p.reduce((s,x)=>s+x.valor,0);
