@@ -2,7 +2,7 @@
 // CONFIGURACIÓN - COBROS PRO v4
 // ============================================================
 const CONFIG = {
-  API_URL: 'https://script.google.com/macros/s/TU_ID_AQUI/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbzr_aXXhJe4MA0dSpGp5j_s25E0kfL9dP5iFR7-nvpkEU7j5KhKMcJFHM2fWFJYw_QsbA/exec',
   DIA_CIERRE: 8,
   MIN_BALANCE: 5,
   USUARIOS: [],
