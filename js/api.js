@@ -3,7 +3,7 @@
 // ============================================================
 const API = {
   async get(action, params = {}) {
-    if (!CONFIG.API_URL || CONFIG.API_URL.includes('TU_ID_AQUI')) throw new Error('URL_NO_CONFIGURADA');
+    if (!CONFIG.API_URL || CONFIG.API_URL.includes('https://script.google.com/macros/s/AKfycbzr_aXXhJe4MA0dSpGp5j_s25E0kfL9dP5iFR7-nvpkEU7j5KhKMcJFHM2fWFJYw_QsbA/exec')) throw new Error('URL_NO_CONFIGURADA');
     const url = new URL(CONFIG.API_URL);
     url.searchParams.append('action', action);
     Object.entries(params).forEach(([k,v]) => { if (v != null && v !== '') url.searchParams.append(k,v); });
@@ -14,7 +14,7 @@ const API = {
   },
 
   async post(action, body = {}) {
-    if (!CONFIG.API_URL || CONFIG.API_URL.includes('TU_ID_AQUI')) throw new Error('URL_NO_CONFIGURADA');
+    if (!CONFIG.API_URL || CONFIG.API_URL.includes('https://script.google.com/macros/s/AKfycbzr_aXXhJe4MA0dSpGp5j_s25E0kfL9dP5iFR7-nvpkEU7j5KhKMcJFHM2fWFJYw_QsbA/exec')) throw new Error('URL_NO_CONFIGURADA');
     const r   = await fetch(CONFIG.API_URL, {
       method:'POST', redirect:'follow',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
